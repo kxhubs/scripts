@@ -503,7 +503,7 @@ vless_info() {
   FLOW=$(cat ${xray_conf_dir}/config.json | jq .inbounds[0].settings.clients[0].flow | tr -d '"')
   DOMAIN=$(cat ${domain_tmp_dir}/domain)
 
-  echo -e "${Red} Xray 配置信息 ${Font}"
+  echo -e "${Red} Vless 配置信息 ${Font}"
   echo -e "${Red} 地址(address):${Font}  $DOMAIN"
   echo -e "${Red} 端口(port):${Font}  $PORT"
   echo -e "${Red} 用户 ID(UUID):${Font} $UUID"
@@ -512,6 +512,7 @@ vless_info() {
   echo -e "${Red} 传输协议(network):${Font} tcp "
   echo -e "${Red} 伪装类型(type):${Font} none "
   echo -e "${Red} 底层传输安全:${Font} tls"
+  echo -e "${Red} SNI:${Font}  $DOMAIN"
   echo -e "${Red} 跳过证书验证(allowInsecure):${Font}  false"
   echo -e "${Red} 指纹模拟(fingerprint):${Font}  chrome"
   echo -e "${Red} Alpn:${Font}  h2,http/1.1"
@@ -538,7 +539,7 @@ trojan_info() {
 }
 
 basic_info() {
-  print_ok "VLESS+TCP+TLS+Nginx 安装成功"
+  print_ok "VLESS+Trojan+TCP+TLS+Nginx 安装成功"
   vless_info
   vless_link
   trojan_info
@@ -593,7 +594,7 @@ menu() {
   echo -e "${Green}21.${Font} 查看 实时访问日志"
   echo -e "${Green}22.${Font} 查看 实时错误日志"
   echo -e "${Green}23.${Font} 查看 Xray 配置链接"
-  echo -e "${Green}24.${Font}  查看 Trojan 配置信息"
+  echo -e "${Green}24.${Font} 查看 Trojan 配置信息"
   echo -e "—————————————— 其他选项 ——————————————"
   echo -e "${Green}31.${Font} 安装 4 合 1 BBR、锐速安装脚本"
   echo -e "${Green}32.${Font} 卸载 Xray"
