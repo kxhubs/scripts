@@ -475,11 +475,6 @@ vless_link() {
 
   print_ok "URL 链接 (VLESS + TCP + TLS)"
   print_ok "vless://$UUID@$DOMAIN:$PORT?encryption=none&flow=$FLOW&security=tls&sni=$DOMAIN&alpn=h2%2Chttp%2F1.1&type=tcp&headerType=none&host=$DOMAIN#$DOMAIN"
-  
-  print_ok "-------------------------------------------------"
-  
-  print_ok "URL 二维码 (VLESS + TCP + TLS) (请在浏览器中访问)"
-  print_ok "https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=vless://$UUID@$DOMAIN:$PORT?encryption=none&flow=$FLOW&security=tls&sni=$DOMAIN&alpn=h2%2Chttp%2F1.1&type=tcp&headerType=none#$DOMAIN"
 }
 
 trojan_link() {
@@ -490,11 +485,6 @@ trojan_link() {
 
   print_ok "URL 链接 (Trojan + TCP + TLS)"
   print_ok "trojan://$PASSWD@$DOMAIN:$PORT?flow=$FLOW&security=tls&sni=$DOMAIN&alpn=h2%2Chttp%2F1.1&type=tcp&headerType=none#$DOMAIN"
-  
-  print_ok "-------------------------------------------------"
-  
-  print_ok "URL 二维码 (VLESS + TCP + TLS) (请在浏览器中访问)"
-  print_ok "https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=trojan://$PASSWD@$DOMAIN:$PORT?flow=$FLOW&security=tls&sni=$DOMAIN&alpn=h2%2Chttp%2F1.1&type=tcp&headerType=none#$DOMAIN"
 }
 
 vless_info() {
