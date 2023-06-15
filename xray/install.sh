@@ -21,7 +21,7 @@ OK="${Green}[OK]${Font}"
 ERROR="${Red}[ERROR]${Font}"
 
 # 变量
-shell_version="0.2.8"
+shell_version="0.2.9"
 gitea_branch="main"
 xray_conf_dir="/usr/local/etc/xray"
 xray_access_log="/var/log/xray/access.log"
@@ -630,15 +630,10 @@ menu() {
     tail -f $xray_error_log
     ;;
   23)
-    if [[ -f $xray_conf_dir/config.json ]]; then
-      if [[ ${shell_mode} == "tcp" ]]; then
-        basic_information
-      elif [[ ${shell_mode} == "ws" ]]; then
-        basic_ws_information
-      fi
-    else
-      print_error "xray 配置文件不存在"
-    fi
+    xray_info
+    ;;
+  24)
+    torjan_info
     ;;
   31)
     bbr_boost_sh
