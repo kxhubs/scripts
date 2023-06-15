@@ -21,7 +21,7 @@ OK="${Green}[OK]${Font}"
 ERROR="${Red}[ERROR]${Font}"
 
 # 变量
-shell_version="0.3.1"
+shell_version="0.3.2"
 gitea_branch="main"
 xray_conf_dir="/usr/local/etc/xray"
 xray_access_log="/var/log/xray/access.log"
@@ -632,9 +632,11 @@ menu() {
     ;;
   23)
     vless_info
+    vless_link
     ;;
   24)
     trojan_info
+    trojan_link
     ;;
   31)
     bbr_boost_sh
