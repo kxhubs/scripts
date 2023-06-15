@@ -483,7 +483,7 @@ vless_link() {
 }
 
 trojan_link() {
-  PASSWD=$(cat ${xray_conf_dir}/config.json | jq .inbounds[0].settings.clients[1].password | tr -d '"')
+  PASSWD=$(cat ${xray_conf_dir}/config.json | jq .inbounds[1].settings.clients[0].password | tr -d '"')
   PORT=$(cat ${xray_conf_dir}/config.json | jq .inbounds[0].port)
   FLOW=$(cat ${xray_conf_dir}/config.json | jq .inbounds[0].settings.clients[0].flow | tr -d '"')
   DOMAIN=$(cat ${domain_tmp_dir}/domain)
@@ -518,7 +518,7 @@ vless_info() {
 }
 
 trojan_info() {
-  PASSWD=$(cat ${xray_conf_dir}/config.json | jq .inbounds[0].settings.clients[1].password | tr -d '"')
+  PASSWD=$(cat ${xray_conf_dir}/config.json | jq .inbounds[1].settings.clients[0].password | tr -d '"')
   PORT=$(cat ${xray_conf_dir}/config.json | jq .inbounds[0].port)
   FLOW=$(cat ${xray_conf_dir}/config.json | jq .inbounds[0].settings.clients[0].flow | tr -d '"')
   DOMAIN=$(cat ${domain_tmp_dir}/domain)
