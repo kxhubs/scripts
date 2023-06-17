@@ -21,7 +21,7 @@ OK="${Green}[OK]${Font}"
 ERROR="${Red}[ERROR]${Font}"
 
 # 变量
-shell_version="0.3.2"
+shell_version="0.3.3"
 gitea_branch="main"
 xray_conf_dir="/usr/local/etc/xray"
 xray_access_log="/var/log/xray/access.log"
@@ -566,6 +566,7 @@ install_xray() {
 }
 
 menu() {
+  clear
   update_sh
   shell_mode_check
   echo -e "\t Xray 安装管理脚本 ${Red}[${shell_version}]${Font}"
