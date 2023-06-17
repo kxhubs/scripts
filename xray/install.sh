@@ -78,14 +78,14 @@ system_check() {
   if [[ "${ID}" == "centos" && ${VERSION_ID} -ge 7 ]]; then
     print_ok "当前系统为 Centos ${VERSION_ID} ${VERSION}"
     INS="yum install -y"
-    ${INS} wget vim socat
+    ${INS} wget vim socat curl
     wget -N -P /etc/yum.repos.d/ https://kxhubs.com:18512/kxhubs/ssh-scripts/raw/branch/${gitea_branch}/xray/nginx.repo
 
 
   elif [[ "${ID}" == "ol" ]]; then
     print_ok "当前系统为 Oracle Linux ${VERSION_ID} ${VERSION}"
     INS="yum install -y"
-    {INS} wget vim socat
+    ${INS} wget vim socat curl
     wget -N -P /etc/yum.repos.d/ https://kxhubs.com:18512/kxhubs/ssh-scripts/raw/branch/${gitea_branch}/xray/nginx.repo
   elif [[ "${ID}" == "debian" && ${VERSION_ID} -ge 9 ]]; then
     print_ok "当前系统为 Debian ${VERSION_ID} ${VERSION}"
