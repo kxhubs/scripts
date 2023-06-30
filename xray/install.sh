@@ -21,7 +21,7 @@ OK="${Green}[OK]${Font}"
 ERROR="${Red}[ERROR]${Font}"
 
 # 变量
-shell_version="0.3.3"
+shell_version="0.4.1"
 gitea_branch="main"
 xray_conf_dir="/usr/local/etc/xray"
 xray_access_log="/var/log/xray/access.log"
@@ -33,627 +33,639 @@ password=$(openssl rand -base64 18 | tr -d '/+' | cut -c1-12)
 
 VERSION=$(echo "${VERSION}" | awk -F "[()]" '{print $2}')
 
-shell_mode_check() {
-  if [ -f ${xray_conf_dir}/config.json ]; then
-    if [ "$(grep -c "wsSettings" ${xray_conf_dir}/config.json)" -ge 1 ]; then
-      shell_mode="ws"
-    else
-      shell_mode="tcp"
-    fi
-  else
-    shell_mode="None"
-  fi
+function print_ok() {
+	echo -e "${OK} ${Blue} $1 ${Font}"
 }
 
-print_ok() {
-  echo -e "${OK} ${Blue} $1 ${Font}"
+function print_error() {
+	echo -e "${ERROR} ${RedBG} $1 ${Font}"
 }
 
-print_error() {
-  echo -e "${ERROR} ${RedBG} $1 ${Font}"
+function check() {
+	if [[ 0 -eq $? ]]; then
+		print_ok "$1 完成"
+		sleep 1
+	else
+		print_error "$1 失败"
+		exit 1
+	fi
 }
 
-check_root() {
-  if [[ 0 == "$UID" ]]; then
-    print_ok "当前用户是 root 用户，开始安装流程"
-  else
-    print_error "当前用户不是 root 用户，请切换到 root 用户后重新执行脚本"
-    exit 1
-  fi
+function check_root() {
+    if [ $(id -u) -ne 0 ];then
+		echo "当前不是root用户"
+		exit 1
+	fi
 }
 
-judge() {
-  if [[ 0 -eq $? ]]; then
-    print_ok "$1 完成"
-    sleep 1
-  else
-    print_error "$1 失败"
-    exit 1
-  fi
+function update_sh()  {
+	clear
+	ol_version=$(curl -L -s https://kxhubs.com:18512/kxhubs/ssh-scripts/raw/branch/${gitea_branch}/xray/install.sh | grep "shell_version=" | head -1 | awk -F '=|"' '{print $3}')
+	if [[ "$shell_version" != "$(echo -e "$shell_version\n$ol_version" | sort -rV | head -1)" ]]; then
+		print_ok "存在新版本，是否更新 [Y/N]?"
+		read -r update_confirm
+		case $update_confirm in
+			[yY][eE][sS] | [yY])
+				wget -N --no-check-certificate https://kxhubs.com:18512/kxhubs/ssh-scripts/raw/branch/${gitea_branch}/xray/install.sh
+				print_ok "更新完成"
+				print_ok "您可以通过 bash $0 执行本程序"
+				exit 0
+				;;
+			*) ;;
+		esac
+	else
+		print_ok "当前版本为最新版本"
+		print_ok "您可以通过 bash $0 执行本程序"
+	fi
 }
 
-system_check() {
-  source '/etc/os-release'
-
-  if [[ "${ID}" == "centos" && ${VERSION_ID} -ge 7 ]]; then
-    print_ok "当前系统为 Centos ${VERSION_ID} ${VERSION}"
-    INS="yum install -y"
-    ${INS} wget vim socat curl
-    wget -N -P /etc/yum.repos.d/ https://kxhubs.com:18512/kxhubs/ssh-scripts/raw/branch/${gitea_branch}/xray/nginx.repo
-
-
-  elif [[ "${ID}" == "ol" ]]; then
-    print_ok "当前系统为 Oracle Linux ${VERSION_ID} ${VERSION}"
-    INS="yum install -y"
-    ${INS} wget vim socat curl
-    wget -N -P /etc/yum.repos.d/ https://kxhubs.com:18512/kxhubs/ssh-scripts/raw/branch/${gitea_branch}/xray/nginx.repo
-  elif [[ "${ID}" == "debian" && ${VERSION_ID} -ge 9 ]]; then
-    print_ok "当前系统为 Debian ${VERSION_ID} ${VERSION}"
-    INS="apt install -y"
-    # 清除可能的遗留问题
-    rm -f /etc/apt/sources.list.d/nginx.list
-    # nginx 安装预处理
-    $INS curl gnupg2 ca-certificates lsb-release debian-archive-keyring wget vim socat
-    curl https://nginx.org/keys/nginx_signing.key | gpg --dearmor \
-    | tee /usr/share/keyrings/nginx-archive-keyring.gpg >/dev/null
-    echo "deb [signed-by=/usr/share/keyrings/nginx-archive-keyring.gpg] \
-    http://nginx.org/packages/debian $(lsb_release -cs) nginx" \
-    | tee /etc/apt/sources.list.d/nginx.list
-    echo -e "Package: *\nPin: origin nginx.org\nPin: release o=nginx\nPin-Priority: 900\n" \
-    | tee /etc/apt/preferences.d/99nginx
-
-    apt update
-
-  elif [[ "${ID}" == "ubuntu" && $(echo "${VERSION_ID}" | cut -d '.' -f1) -ge 18 ]]; then
-    print_ok "当前系统为 Ubuntu ${VERSION_ID} ${UBUNTU_CODENAME}"
-    INS="apt install -y"
-    # 清除可能的遗留问题
-    rm -f /etc/apt/sources.list.d/nginx.list
-    # nginx 安装预处理
-    $INS curl gnupg2 ca-certificates lsb-release ubuntu-keyring wget vim socat
-    curl https://nginx.org/keys/nginx_signing.key | gpg --dearmor \
-    | tee /usr/share/keyrings/nginx-archive-keyring.gpg >/dev/null
-    echo "deb [signed-by=/usr/share/keyrings/nginx-archive-keyring.gpg] \
-    http://nginx.org/packages/ubuntu $(lsb_release -cs) nginx" \
-    | tee /etc/apt/sources.list.d/nginx.list
-    echo -e "Package: *\nPin: origin nginx.org\nPin: release o=nginx\nPin-Priority: 900\n" \
-    | tee /etc/apt/preferences.d/99nginx
-
-    apt update
-  else
-    print_error "当前系统为 ${ID} ${VERSION_ID} 不在支持的系统列表内"
-    exit 1
-  fi
-
-  if grep -q "nogroup" /etc/group; then
-    cert_group="nogroup"
-  fi
-
-  $INS dbus
-
-  # 关闭各类防火墙
-  systemctl stop firewalld
-  systemctl disable firewalld
-  systemctl stop nftables
-  systemctl disable nftables
-  systemctl stop ufw
-  systemctl disable ufw
+function shell_mode_check() {
+	if [ -f ${xray_conf_dir}/config.json ]; then
+		shell_mode="已安装"
+	else
+		shell_mode="未安装"
+	fi
 }
 
-nginx_install() {
-  if ! command -v nginx >/dev/null 2>&1; then
-    ${INS} nginx
-    judge "Nginx 安装"
-  else
-    print_ok "Nginx 已存在"
-  fi
-  # 遗留问题处理
-  mkdir -p /etc/nginx/conf.d >/dev/null 2>&1
+function system_check() {
+	source '/etc/os-release'
+	
+	if [[ "${ID}" == "centos" && ${VERSION_ID} -ge 7 ]]; then
+		print_ok "当前系统为 Centos ${VERSION_ID} ${VERSION}"
+		INS="yum install -y"
+		${INS} wget curl vim
+		wget -N -P /etc/yum.repos.d/ https://kxhubs.com:18512/kxhubs/ssh-scripts/raw/branch/${gitea_branch}/xray/nginx.repo
+	elif [[ "${ID}" == "ol" ]]; then
+		print_ok "当前系统为 Oracle Linux ${VERSION_ID} ${VERSION}"
+		INS="yum install -y"
+		${INS} wget curl vim
+	elif [[ "${ID}" == "debian" && ${VERSION_ID} -ge 9 ]]; then
+		print_ok "当前系统为 Debian ${VERSION_ID} ${VERSION}"
+		INS="apt install -y"
+		# 清除可能的遗留问题
+		rm -f /etc/apt/sources.list.d/nginx.list
+		# nginx 安装预处理
+		${INS} curl gnupg2 ca-certificates lsb-release debian-archive-keyring wget vim
+		curl https://nginx.org/keys/nginx_signing.key | gpg --dearmor \
+		| tee /usr/share/keyrings/nginx-archive-keyring.gpg >/dev/null
+		echo "deb [signed-by=/usr/share/keyrings/nginx-archive-keyring.gpg] \
+		http://nginx.org/packages/debian $(lsb_release -cs) nginx" \
+		| tee /etc/apt/sources.list.d/nginx.list
+		echo -e "Package: *\nPin: origin nginx.org\nPin: release o=nginx\nPin-Priority: 900\n" \
+		| tee /etc/apt/preferences.d/99nginx
+		apt update
+	elif [[ "${ID}" == "ubuntu" && $(echo "${VERSION_ID}" | cut -d '.' -f1) -ge 18 ]]; then
+		print_ok "当前系统为 Ubuntu ${VERSION_ID} ${UBUNTU_CODENAME}"
+		INS="apt install -y"
+		# 清除可能的遗留问题
+		rm -f /etc/apt/sources.list.d/nginx.list
+		# nginx 安装预处理
+		$INS curl gnupg2 ca-certificates lsb-release ubuntu-keyring wget vim
+		curl https://nginx.org/keys/nginx_signing.key | gpg --dearmor \
+		| tee /usr/share/keyrings/nginx-archive-keyring.gpg >/dev/null
+		echo "deb [signed-by=/usr/share/keyrings/nginx-archive-keyring.gpg] \
+		http://nginx.org/packages/ubuntu $(lsb_release -cs) nginx" \
+		| tee /etc/apt/sources.list.d/nginx.list
+		echo -e "Package: *\nPin: origin nginx.org\nPin: release o=nginx\nPin-Priority: 900\n" \
+		| tee /etc/apt/preferences.d/99nginx
+		apt update
+	else
+		print_error "当前系统为 ${ID} ${VERSION_ID} 不在支持的系统列表内"
+		exit 0
+	fi
+	
+	# 关闭防火墙
+	systemctl stop firewalld
+	systemctl disable firewalld
+	systemctl stop nftables
+	systemctl disable nftables
+	systemctl stop ufw
+	systemctl disable ufw
 }
 
-dependency_install() {
-  ${INS} lsof tar
-  judge "安装 lsof tar"
+function dependency_install() {
+	${INS} lsof tar
+	check "安装 lsof tar"
 
-  if [[ "${ID}" == "centos" || "${ID}" == "ol" ]]; then
-    ${INS} crontabs
-  else
-    ${INS} cron
-  fi
-  judge "安装 crontab"
+	if [[ "${ID}" == "centos" || "${ID}" == "ol" ]]; then
+		${INS} crontabs
+	else
+		${INS} cron
+	fi
+	check "安装 crontab"
   
-  if [[ "${ID}" == "centos" || "${ID}" == "ol" ]]; then
-    touch /var/spool/cron/root && chmod 600 /var/spool/cron/root
-    systemctl start crond && systemctl enable crond
-  else
-    touch /var/spool/cron/crontabs/root && chmod 600 /var/spool/cron/crontabs/root
-    systemctl start cron && systemctl enable cron
-  fi
-  judge "crontab 自启动配置 "
+	if [[ "${ID}" == "centos" || "${ID}" == "ol" ]]; then
+		touch /var/spool/cron/root && chmod 600 /var/spool/cron/root
+		systemctl start crond && systemctl enable crond
+	else
+		touch /var/spool/cron/crontabs/root && chmod 600 /var/spool/cron/crontabs/root
+		systemctl start cron && systemctl enable cron
+	fi
+	check "crontab 自启动配置 "
+
+	${INS} unzip
+	check "安装 unzip"
+
+	${INS} curl
+	check "安装 curl"
+	
+	${INS} socat
+	check "安装 socat"
+
+	${INS} systemd
+	check "安装/升级 systemd"
+
+	if [[ "${ID}" == "centos" ]]; then
+		${INS} pcre pcre-devel zlib-devel epel-release openssl openssl-devel
+	elif [[ "${ID}" == "ol" ]]; then
+		${INS} pcre pcre-devel zlib-devel openssl openssl-devel
+		# Oracle Linux 不同日期版本的 VERSION_ID 比较乱 直接暴力处理。如出现问题或有更好的方案，请提交 Issue。
+		yum-config-manager --enable ol7_developer_EPEL >/dev/null 2>&1
+		yum-config-manager --enable ol8_developer_EPEL >/dev/null 2>&1
+	else
+		${INS} libpcre3 libpcre3-dev zlib1g-dev openssl libssl-dev
+	fi
   
-  ${INS} unzip
-  judge "安装 unzip"
+	${INS} jq
 
-  ${INS} curl
-  judge "安装 curl"
+	if ! command -v jq; then
+		wget -P /usr/bin https://kxhubs.com:18512/kxhubs/ssh-scripts/raw/branch/${gitea_branch}/xray/jq && chmod +x /usr/bin/jq
+		check "安装 jq"
+	fi
 
-  # upgrade systemd
-  ${INS} systemd
-  judge "安装/升级 systemd"
-
-  if [[ "${ID}" == "centos" ]]; then
-    ${INS} pcre pcre-devel zlib-devel epel-release openssl openssl-devel
-  elif [[ "${ID}" == "ol" ]]; then
-    ${INS} pcre pcre-devel zlib-devel openssl openssl-devel
-    # Oracle Linux 不同日期版本的 VERSION_ID 比较乱 直接暴力处理。如出现问题或有更好的方案，请提交 Issue。
-    yum-config-manager --enable ol7_developer_EPEL >/dev/null 2>&1
-    yum-config-manager --enable ol8_developer_EPEL >/dev/null 2>&1
-  else
-    ${INS} libpcre3 libpcre3-dev zlib1g-dev openssl libssl-dev
-  fi
-  
-  ${INS} jq
-  
-  if ! command -v jq; then
-    wget -P /usr/bin https://kxhubs.com:18512/kxhubs/ssh-scripts/raw/branch/${gitea_branch}/xray/jq && chmod +x /usr/bin/jq
-    judge "安装 jq"
-  fi
-  
-  # 防止部分系统xray的默认bin目录缺失
-  mkdir /usr/local/bin >/dev/null 2>&1
- }
-
-basic_optimization() {
-  # 最大文件打开数
-  sed -i '/^\*\ *soft\ *nofile\ *[[:digit:]]*/d' /etc/security/limits.conf
-  sed -i '/^\*\ *hard\ *nofile\ *[[:digit:]]*/d' /etc/security/limits.conf
-  echo '* soft nofile 65536' >>/etc/security/limits.conf
-  echo '* hard nofile 65536' >>/etc/security/limits.conf
-
-  # RedHat 系发行版关闭 SELinux
-  if [[ "${ID}" == "centos" || "${ID}" == "ol" ]]; then
-    sed -i 's/^SELINUX=.*/SELINUX=disabled/' /etc/selinux/config
-    setenforce 0
-  fi
+	# 防止部分系统xray的默认bin目录缺失
+	mkdir /usr/local/bin >/dev/null 2>&1
 }
 
-domain_check() {
-  read -rp "请输入你的域名信息(eg: www.kxhubs.com):" domain
-  domain_ip=$(curl -sm8 ipget.net/?ip="${domain}")
-  print_ok "正在获取 IP 地址信息，请耐心等待"
-  wgcfv4_status=$(curl -s4m8 https://www.cloudflare.com/cdn-cgi/trace -k | grep warp | cut -d= -f2)
-  wgcfv6_status=$(curl -s6m8 https://www.cloudflare.com/cdn-cgi/trace -k | grep warp | cut -d= -f2)
-  if [[ ${wgcfv4_status} =~ "on"|"plus" ]] || [[ ${wgcfv6_status} =~ "on"|"plus" ]]; then
-    # 关闭wgcf-warp，以防误判VPS IP情况
-    wg-quick down wgcf >/dev/null 2>&1
-    print_ok "已关闭 wgcf-warp"
-  fi
-  local_ipv4=$(curl -4 ip.sb)
-  local_ipv6=$(curl -6 ip.sb)
-  if [[ -z ${local_ipv4} && -n ${local_ipv6} ]]; then
-    # 纯IPv6 VPS，自动添加DNS64服务器以备acme.sh申请证书使用
-    echo -e nameserver 2a01:4f8:c2c:123f::1 > /etc/resolv.conf
-    print_ok "识别为 IPv6 Only 的 VPS，自动添加 DNS64 服务器"
-  fi
-  echo -e "域名通过 DNS 解析的 IP 地址:${domain_ip}"
-  echo -e "本机公网 IPv4 地址: ${local_ipv4}"
-  echo -e "本机公网 IPv6 地址: ${local_ipv6}"
-  sleep 2
-  if [[ ${domain_ip} == "${local_ipv4}" ]]; then
-    print_ok "域名通过 DNS 解析的 IP 地址与 本机 IPv4 地址匹配"
-    sleep 2
-  elif [[ ${domain_ip} == "${local_ipv6}" ]]; then
-    print_ok "域名通过 DNS 解析的 IP 地址与 本机 IPv6 地址匹配"
-    sleep 2
-  else
-    print_error "请确保域名添加了正确的 A / AAAA 记录，否则将无法正常使用 xray"
-    print_error "域名通过 DNS 解析的 IP 地址与 本机 IPv4 / IPv6 地址不匹配，是否继续安装？(y/n)" && read -r install
-    case $install in
-    [yY][eE][sS] | [yY])
-      print_ok "继续安装"
-      sleep 2
-      ;;
-    *)
-      print_error "安装终止"
-      exit 2
-      ;;
-    esac
+function basic_optimization() {
+	# 最大文件打开数
+	sed -i '/^\*\ *soft\ *nofile\ *[[:digit:]]*/d' /etc/security/limits.conf
+	sed -i '/^\*\ *hard\ *nofile\ *[[:digit:]]*/d' /etc/security/limits.conf
+	echo '* soft nofile 65536' >>/etc/security/limits.conf
+	echo '* hard nofile 65536' >>/etc/security/limits.conf
+	# RedHat 系发行版关闭 SELinux
+	if [[ "${ID}" == "centos" || "${ID}" == "ol" ]]; then
+		sed -i 's/^SELINUX=.*/SELINUX=disabled/' /etc/selinux/config
+		setenforce 0
+	fi
+}
+
+function xray_install() {
+	print_ok "安装Xray"
+	bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
+	check "Xray安装"
+}
+
+function modify_uuid() {
+	[ -z "$UUID" ] && UUID=$(cat /proc/sys/kernel/random/uuid)
+	cat ${xray_conf_dir}/config.json | jq 'setpath(["inbounds",0,"settings","clients",0,"id"];"'${UUID}'")' >${xray_conf_dir}/config_tmp.json
+	xray_tmp_config_file_check_and_use
+	check "Xray UUID 修改"
+}
+
+function port_exist_check() {
+	if [[ 0 -eq $(lsof -i:"$1" | grep -i -c "listen") ]]; then
+		print_ok "$1 端口未被占用"
+		sleep 1
+	else
+		print_error "检测到 $1 端口被占用，以下为 $1 端口占用信息"
+		lsof -i:"$1"
+		print_error "5s 后将尝试自动 kill 占用进程"
+		sleep 5
+		lsof -i:"$1" | awk '{print $2}' | grep -v "PID" | xargs kill -9
+		print_ok "kill 完成"
+		sleep 1
   fi
 }
 
-port_exist_check() {
-  if [[ 0 -eq $(lsof -i:"$1" | grep -i -c "listen") ]]; then
-    print_ok "$1 端口未被占用"
-    sleep 1
-  else
-    print_error "检测到 $1 端口被占用，以下为 $1 端口占用信息"
-    lsof -i:"$1"
-    print_error "5s 后将尝试自动 kill 占用进程"
-    sleep 5
-    lsof -i:"$1" | awk '{print $2}' | grep -v "PID" | xargs kill -9
-    print_ok "kill 完成"
-    sleep 1
-  fi
+function  modify_port() {
+	read -rp "请输入端口号(默认:443):" PORT
+	[ -z "$PORT" ] && PORT="443"
+	if [[ $PORT -le 0 ]] || [[ $PORT -gt 65535 ]]; then
+		print_error "请输入 0-65535 之间的值"
+		exit 1
+	fi
+	port_exist_check $PORT
+	cat ${xray_conf_dir}/config.json | jq 'setpath(["inbounds",0,"port"];'${PORT}')' >${xray_conf_dir}/config_tmp.json
+	xray_tmp_config_file_check_and_use
+	check "Xray 端口 修改"
 }
 
-update_sh() {
-  ol_version=$(curl -L -s https://kxhubs.com:18512/kxhubs/ssh-scripts/raw/branch/${gitea_branch}/xray/install.sh | grep "shell_version=" | head -1 | awk -F '=|"' '{print $3}')
-  if [[ "$shell_version" != "$(echo -e "$shell_version\n$ol_version" | sort -rV | head -1)" ]]; then
-    print_ok "存在新版本，是否更新 [Y/N]?"
-    read -r update_confirm
-    case $update_confirm in
-    [yY][eE][sS] | [yY])
-      wget -N --no-check-certificate https://kxhubs.com:18512/kxhubs/ssh-scripts/raw/branch/${gitea_branch}/xray/install.sh
-      print_ok "更新完成"
-      print_ok "您可以通过 bash $0 执行本程序"
-      exit 0
-      ;;
-    *) ;;
-    esac
-  else
-    print_ok "当前版本为最新版本"
-    print_ok "您可以通过 bash $0 执行本程序"
-  fi
+function modify_passwd() {
+	[ -z "$PASSWD" ] && PASSWD=$(openssl rand -base64 18 | tr -d '/+' | cut -c1-12)
+	cat ${xray_conf_dir}/config.json | jq 'setpath(["inbounds",1,"settings","clients",0,"password"];"'${PASSWD}'")' >${xray_conf_dir}/config_tmp.json
+	xray_tmp_config_file_check_and_use
+	check "Trojan 密码 修改"
 }
 
-xray_tmp_config_file_check_and_use() {
-  if [[ -s ${xray_conf_dir}/config_tmp.json ]]; then
-    mv -f ${xray_conf_dir}/config_tmp.json ${xray_conf_dir}/config.json
-  else
-    print_error "xray 配置文件修改异常"
-  fi
+function xray_tmp_config_file_check_and_use() {
+	if [[ -s ${xray_conf_dir}/config_tmp.json ]]; then
+		mv -f ${xray_conf_dir}/config_tmp.json ${xray_conf_dir}/config.json
+	else
+		print_error "xray 配置文件修改异常"
+	fi
 }
 
-modify_UUID() {
-  [ -z "$UUID" ] && UUID=$(cat /proc/sys/kernel/random/uuid)
-  cat ${xray_conf_dir}/config.json | jq 'setpath(["inbounds",0,"settings","clients",0,"id"];"'${UUID}'")' >${xray_conf_dir}/config_tmp.json
-  xray_tmp_config_file_check_and_use
-  judge "Xray UUID 修改"
+function domain_check() {
+	read -rp "请输入你的域名信息(eg: www.kxhubs.com):" domain
+	domain_ip=$(curl -sm8 ipget.net/?ip="${domain}")
+	print_ok "正在获取 IP 地址信息，请耐心等待"
+	wgcfv4_status=$(curl -s4m8 https://www.cloudflare.com/cdn-cgi/trace -k | grep warp | cut -d= -f2)
+	wgcfv6_status=$(curl -s6m8 https://www.cloudflare.com/cdn-cgi/trace -k | grep warp | cut -d= -f2)
+	if [[ ${wgcfv4_status} =~ "on"|"plus" ]] || [[ ${wgcfv6_status} =~ "on"|"plus" ]]; then
+		# 关闭wgcf-warp，以防误判VPS IP情况
+		wg-quick down wgcf >/dev/null 2>&1
+		print_ok "已关闭 wgcf-warp"
+	fi
+	local_ipv4=$(curl -4 ip.sb)
+	local_ipv6=$(curl -6 ip.sb)
+	if [[ -z ${local_ipv4} && -n ${local_ipv6} ]]; then
+		# 纯IPv6 VPS，自动添加DNS64服务器以备acme.sh申请证书使用
+		echo -e nameserver 2a01:4f8:c2c:123f::1 > /etc/resolv.conf
+		print_ok "识别为 IPv6 Only 的 VPS，自动添加 DNS64 服务器"
+	fi
+	echo -e "域名通过 DNS 解析的 IP 地址:${domain_ip}"
+	echo -e "本机公网 IPv4 地址: ${local_ipv4}"
+	echo -e "本机公网 IPv6 地址: ${local_ipv6}"
+	sleep 2
+	if [[ ${domain_ip} == "${local_ipv4}" ]]; then
+		print_ok "域名通过 DNS 解析的 IP 地址与 本机 IPv4 地址匹配"
+		sleep 2
+	elif [[ ${domain_ip} == "${local_ipv6}" ]]; then
+		print_ok "域名通过 DNS 解析的 IP 地址与 本机 IPv6 地址匹配"
+		sleep 2
+	else
+		print_error "请确保域名添加了正确的 A / AAAA 记录，否则将无法正常使用 xray"
+		print_error "域名通过 DNS 解析的 IP 地址与 本机 IPv4 / IPv6 地址不匹配，是否继续安装？(y/n)" && read -r install
+		case $install in
+		[yY][eE][sS] | [yY])
+			print_ok "继续安装"
+			sleep 2
+			;;
+		*)
+			print_error "安装终止"
+			exit 2
+			;;
+		esac
+	fi
+	
+	echo $domain >$domain_tmp_dir/domain
+	check "域名记录"
 }
 
-modify_PASSWD() {
-  [ -z "$PASSWD" ] && PASSWD=$(openssl rand -base64 18 | tr -d '/+' | cut -c1-12)
-  cat ${xray_conf_dir}/config.json | jq 'setpath(["inbounds",1,"settings","clients",0,"password"];"'${PASSWD}'")' >${xray_conf_dir}/config_tmp.json
-  xray_tmp_config_file_check_and_use
-  judge "Trojan 密码 修改"
+function acme_install() {
+	curl -L https://get.acme.sh | bash
+	check "安装 SSL 证书生成脚本"
 }
 
-configure_nginx() {
-  nginx_conf="/etc/nginx/conf.d/${domain}.conf"
-  cd /etc/nginx/conf.d/ && rm -f ${domain}.conf && wget -O ${domain}.conf https://kxhubs.com:18512/kxhubs/ssh-scripts/raw/branch/${gitea_branch}/xray/web.conf
-  sed -i "s/xxx/${domain}/g" ${nginx_conf}
-  judge "Nginx 配置 修改"
-  
-  systemctl enable nginx
-  systemctl restart nginx
+function ssl_judge_and_install() {
+	"$HOME"/.acme.sh/acme.sh --set-default-ca --server letsencrypt   #设置默认颁发证书机构为letsencrypt
+	if "$HOME"/.acme.sh/acme.sh --issue --standalone --insecure -d "${domain}" --webroot /ssl -k ec-256 --force; then
+		print_ok "SSL 证书生成成功"
+		sleep 2
+		if "$HOME"/.acme.sh/acme.sh --installcert -d "${domain}" --fullchainpath /ssl/xray.crt --keypath /ssl/xray.key --reloadcmd "systemctl restart xray" --ecc --force; then
+			print_ok "SSL 证书配置成功"
+			sleep 2
+			if [[ -n $(type -P wgcf) && -n $(type -P wg-quick) ]]; then
+				wg-quick up wgcf >/dev/null 2>&1
+				print_ok "已启动 wgcf-warp"
+			fi
+	fi
+	elif "$HOME"/.acme.sh/acme.sh --issue --standalone --insecure -d "${domain}" --webroot /ssl -k ec-256 --force --listen-v6; then
+		print_ok "SSL 证书生成成功"
+		sleep 2
+		if "$HOME"/.acme.sh/acme.sh --installcert -d "${domain}" --fullchainpath /ssl/xray.crt --keypath /ssl/xray.key --reloadcmd "systemctl restart xray" --ecc --force; then
+			print_ok "SSL 证书配置成功"
+			sleep 2
+			if [[ -n $(type -P wgcf) && -n $(type -P wg-quick) ]]; then
+				wg-quick up wgcf >/dev/null 2>&1
+				print_ok "已启动 wgcf-warp"
+			fi
+		fi
+	else
+		print_error "SSL 证书生成失败"
+		rm -rf "$HOME/.acme.sh/${domain}_ecc"
+		if [[ -n $(type -P wgcf) && -n $(type -P wg-quick) ]]; then
+			wg-quick up wgcf >/dev/null 2>&1
+			print_ok "已启动 wgcf-warp"
+		fi
+		exit 1
+	fi
 }
 
-modify_port() {
-  read -rp "请输入端口号(默认:443):" PORT
-  [ -z "$PORT" ] && PORT="443"
-  if [[ $PORT -le 0 ]] || [[ $PORT -gt 65535 ]]; then
-    print_error "请输入 0-65535 之间的值"
-    exit 1
-  fi
-  port_exist_check $PORT
-  cat ${xray_conf_dir}/config.json | jq 'setpath(["inbounds",0,"port"];'${PORT}')' >${xray_conf_dir}/config_tmp.json
-  xray_tmp_config_file_check_and_use
-  judge "Xray 端口 修改"
+function ssl_chekck_and_install() {
+	mkdir -p /ssl >/dev/null 2>&1
+	if [[ -f "/ssl/xray.key" || -f "/ssl/xray.crt" ]]; then
+		print_ok "/ssl 目录下证书文件已存在"
+		print_ok "是否删除 /ssl 目录下的证书文件 [Y/N]?"
+		read -r ssl_delete
+		case $ssl_delete in
+		[yY][eE][sS] | [yY])
+			rm -rf /ssl/*
+			print_ok "已删除"
+			;;
+		*) ;;
+		esac
+	fi
+	if [[ -f "/ssl/xray.key" || -f "/ssl/xray.crt" ]]; then
+		echo "证书文件已存在"
+	elif [[ -f "$HOME/.acme.sh/${domain}_ecc/${domain}.key" && -f "$HOME/.acme.sh/${domain}_ecc/${domain}.cer" ]]; then
+		echo "证书文件已存在"
+		"$HOME"/.acme.sh/acme.sh --installcert -d "${domain}" --fullchainpath /ssl/xray.crt --keypath /ssl/xray.key --ecc
+		check "证书启用"
+	else
+		mkdir /ssl
+		acme_install
+		ssl_install
+	fi
+
+	# Xray 默认以 nobody 用户运行，证书权限适配
+	chown -R nobody.$cert_group /ssl/*
 }
 
-configure_xray() {
-  cd /usr/local/etc/xray && rm -f config.json && wget -O config.json https://kxhubs.com:18512/kxhubs/ssh-scripts/raw/branch/${gitea_branch}/xray/config.json
-  modify_UUID
-  modify_port
-  modify_PASSWD
+function nginx_install() {
+	if ! command -v nginx >/dev/null 2>&1; then
+		${INS} nginx
+		check "Nginx 安装"
+	else
+		print_ok "Nginx 已存在"
+	fi
+	# 遗留问题处理
+	mkdir -p /etc/nginx/conf.d >/dev/null 2>&1
 }
 
-xray_install() {
-  print_ok "安装 Xray"
-  curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh | bash -s -- install
-  judge "Xray 安装"
-
-  # 用于生成 Xray 的导入链接
-  echo $domain >$domain_tmp_dir/domain
-  judge "域名记录"
+function configure_nginx() {
+	nginx_conf="/etc/nginx/conf.d/${domain}.conf"
+	rm -f /etc/nginx/conf.d/default.conf
+	cd /etc/nginx/conf.d/ && rm -f ${domain}.conf && wget -O ${domain}.conf https://kxhubs.com:18512/kxhubs/ssh-scripts/raw/branch/${gitea_branch}/xray/web.conf
+	sed -i "s/xxx/${domain}/g" ${nginx_conf}
+	check "Nginx 配置 修改"
+	
+	systemctl enable nginx
+	systemctl restart nginx
 }
 
-ssl_install() {
-  curl -L https://get.acme.sh | bash
-  judge "安装 SSL 证书生成脚本"
+function restart_all() {
+	systemctl restart nginx
+	check "Nginx 启动"
+	systemctl restart xray
+	check "Xray 启动"
 }
 
-acme() {
-  "$HOME"/.acme.sh/acme.sh --set-default-ca --server letsencrypt
-
-  if "$HOME"/.acme.sh/acme.sh --issue --standalone --insecure -d "${domain}" --webroot /ssl -k ec-256 --force; then
-    print_ok "SSL 证书生成成功"
-    sleep 2
-    if "$HOME"/.acme.sh/acme.sh --installcert -d "${domain}" --fullchainpath /ssl/xray.crt --keypath /ssl/xray.key --reloadcmd "systemctl restart xray" --ecc --force; then
-      print_ok "SSL 证书配置成功"
-      sleep 2
-      if [[ -n $(type -P wgcf) && -n $(type -P wg-quick) ]]; then
-        wg-quick up wgcf >/dev/null 2>&1
-        print_ok "已启动 wgcf-warp"
-      fi
-    fi
-  elif "$HOME"/.acme.sh/acme.sh --issue --standalone --insecure -d "${domain}" --webroot /ssl -k ec-256 --force --listen-v6; then
-    print_ok "SSL 证书生成成功"
-    sleep 2
-    if "$HOME"/.acme.sh/acme.sh --installcert -d "${domain}" --fullchainpath /ssl/xray.crt --keypath /ssl/xray.key --reloadcmd "systemctl restart xray" --ecc --force; then
-      print_ok "SSL 证书配置成功"
-      sleep 2
-      if [[ -n $(type -P wgcf) && -n $(type -P wg-quick) ]]; then
-        wg-quick up wgcf >/dev/null 2>&1
-        print_ok "已启动 wgcf-warp"
-      fi
-    fi
-  else
-    print_error "SSL 证书生成失败"
-    rm -rf "$HOME/.acme.sh/${domain}_ecc"
-    if [[ -n $(type -P wgcf) && -n $(type -P wg-quick) ]]; then
-      wg-quick up wgcf >/dev/null 2>&1
-      print_ok "已启动 wgcf-warp"
-    fi
-    exit 1
-  fi
+function configure_xray() {
+	cd /usr/local/etc/xray && rm -f config.json && wget -O config.json https://kxhubs.com:18512/kxhubs/ssh-scripts/raw/branch/${gitea_branch}/xray/config.json
+	modify_uuid
+	modify_port
+	modify_passwd
 }
 
-ssl_judge_and_install() {
-
-  mkdir -p /ssl >/dev/null 2>&1
-  if [[ -f "/ssl/xray.key" || -f "/ssl/xray.crt" ]]; then
-    print_ok "/ssl 目录下证书文件已存在"
-    print_ok "是否删除 /ssl 目录下的证书文件 [Y/N]?"
-    read -r ssl_delete
-    case $ssl_delete in
-    [yY][eE][sS] | [yY])
-      rm -rf /ssl/*
-      print_ok "已删除"
-      ;;
-    *) ;;
-
-    esac
-  fi
-
-  if [[ -f "/ssl/xray.key" || -f "/ssl/xray.crt" ]]; then
-    echo "证书文件已存在"
-  elif [[ -f "$HOME/.acme.sh/${domain}_ecc/${domain}.key" && -f "$HOME/.acme.sh/${domain}_ecc/${domain}.cer" ]]; then
-    echo "证书文件已存在"
-    "$HOME"/.acme.sh/acme.sh --installcert -d "${domain}" --fullchainpath /ssl/xray.crt --keypath /ssl/xray.key --ecc
-    judge "证书启用"
-  else
-    mkdir /ssl
-    ssl_install
-    acme
-  fi
-
-  # Xray 默认以 nobody 用户运行，证书权限适配
-  chown -R nobody.$cert_group /ssl/*
+function uninstall() {
+	curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh | bash -s -- remove --purge
+	print_ok "是否卸载nginx [Y/N]?"
+	read -r uninstall_nginx
+	case $uninstall_nginx in
+	[yY][eE][sS] | [yY])
+		if [[ "${ID}" == "centos" || "${ID}" == "ol" ]]; then
+			yum remove nginx -y
+		else
+			apt purge nginx -y
+		fi
+		;;
+	*) ;;
+	esac
+	print_ok "是否卸载acme.sh [Y/N]?"
+	read -r uninstall_acme
+	case $uninstall_acme in
+	[yY][eE][sS] | [yY])
+		"$HOME"/.acme.sh/acme.sh --uninstall
+		rm -rf /root/.acme.sh
+		rm -rf /ssl/
+		;;
+	*) ;;
+	esac
+	print_ok "卸载完成"
+	exit 0
 }
 
-xray_uninstall() {
-  curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh | bash -s -- remove --purge
-  print_ok "是否卸载nginx [Y/N]?"
-  read -r uninstall_nginx
-  case $uninstall_nginx in
-  [yY][eE][sS] | [yY])
-    if [[ "${ID}" == "centos" || "${ID}" == "ol" ]]; then
-      yum remove nginx -y
-    else
-      apt purge nginx -y
-    fi
-    ;;
-  *) ;;
-  esac
-  print_ok "是否卸载acme.sh [Y/N]?"
-  read -r uninstall_acme
-  case $uninstall_acme in
-  [yY][eE][sS] | [yY])
-    "$HOME"/.acme.sh/acme.sh --uninstall
-    rm -rf /root/.acme.sh
-    rm -rf /ssl/
-    ;;
-  *) ;;
-  esac
-  print_ok "卸载完成"
-  exit 0
+function vless_link() {
+	UUID=$(cat ${xray_conf_dir}/config.json | jq .inbounds[0].settings.clients[0].id | tr -d '"')
+	PORT=$(cat ${xray_conf_dir}/config.json | jq .inbounds[0].port)
+	FLOW=$(cat ${xray_conf_dir}/config.json | jq .inbounds[0].settings.clients[0].flow | tr -d '"')
+	DOMAIN=$(cat ${domain_tmp_dir}/domain)
+
+	print_ok "URL 链接 (VLESS + TCP + TLS)"
+	print_ok "vless://${UUID}@${DOMAIN}:${PORT}?encryption=none&flow=${FLOW}&security=tls&sni=${DOMAIN}&alpn=h2%2Chttp%2F1.1&type=tcp&headerType=none&host=${DOMAIN}#${DOMAIN}"
 }
 
-restart_all() {
-  systemctl restart nginx
-  judge "Nginx 启动"
-  systemctl restart xray
-  judge "Xray 启动"
-}
+function trojan_link() {
+	PASSWD=$(cat ${xray_conf_dir}/config.json | jq .inbounds[1].settings.clients[0].password | tr -d '"')
+	PORT=$(cat ${xray_conf_dir}/config.json | jq .inbounds[0].port)
+	FLOW=$(cat ${xray_conf_dir}/config.json | jq .inbounds[0].settings.clients[0].flow | tr -d '"')
+	DOMAIN=$(cat ${domain_tmp_dir}/domain)
 
-vless_link() {
-  UUID=$(cat ${xray_conf_dir}/config.json | jq .inbounds[0].settings.clients[0].id | tr -d '"')
-  PORT=$(cat ${xray_conf_dir}/config.json | jq .inbounds[0].port)
-  FLOW=$(cat ${xray_conf_dir}/config.json | jq .inbounds[0].settings.clients[0].flow | tr -d '"')
-  DOMAIN=$(cat ${domain_tmp_dir}/domain)
-
-  print_ok "URL 链接 (VLESS + TCP + TLS)"
-  print_ok "vless://$UUID@$DOMAIN:$PORT?encryption=none&flow=$FLOW&security=tls&sni=$DOMAIN&alpn=h2%2Chttp%2F1.1&type=tcp&headerType=none&host=$DOMAIN#$DOMAIN"
-}
-
-trojan_link() {
-  PASSWD=$(cat ${xray_conf_dir}/config.json | jq .inbounds[1].settings.clients[0].password | tr -d '"')
-  PORT=$(cat ${xray_conf_dir}/config.json | jq .inbounds[0].port)
-  FLOW=$(cat ${xray_conf_dir}/config.json | jq .inbounds[0].settings.clients[0].flow | tr -d '"')
-  DOMAIN=$(cat ${domain_tmp_dir}/domain)
-
-  print_ok "URL 链接 (Trojan + TCP + TLS)"
-  print_ok "trojan://$PASSWD@$DOMAIN:$PORT?flow=$FLOW&security=tls&sni=$DOMAIN&alpn=h2%2Chttp%2F1.1&type=tcp&headerType=none#$DOMAIN"
+	print_ok "URL 链接 (Trojan + TCP + TLS)"
+	print_ok "trojan://${PASSWD}@${DOMAIN}:${PORT}?flow=${FLOW}&security=tls&sni=${DOMAIN}&alpn=h2%2Chttp%2F1.1&type=tcp&headerType=none#${DOMAIN}"
 }
 
 vless_info() {
-  UUID=$(cat ${xray_conf_dir}/config.json | jq .inbounds[0].settings.clients[0].id | tr -d '"')
-  PORT=$(cat ${xray_conf_dir}/config.json | jq .inbounds[0].port)
-  FLOW=$(cat ${xray_conf_dir}/config.json | jq .inbounds[0].settings.clients[0].flow | tr -d '"')
-  DOMAIN=$(cat ${domain_tmp_dir}/domain)
+	UUID=$(cat ${xray_conf_dir}/config.json | jq .inbounds[0].settings.clients[0].id | tr -d '"')
+	PORT=$(cat ${xray_conf_dir}/config.json | jq .inbounds[0].port)
+	FLOW=$(cat ${xray_conf_dir}/config.json | jq .inbounds[0].settings.clients[0].flow | tr -d '"')
+	DOMAIN=$(cat ${domain_tmp_dir}/domain)
 
-  echo -e "${Red} Vless 配置信息 ${Font}"
-  echo -e "${Red} 地址(address):${Font}  $DOMAIN"
-  echo -e "${Red} 端口(port):${Font}  $PORT"
-  echo -e "${Red} 用户 ID(UUID):${Font} $UUID"
-  echo -e "${Red} 流控(flow):${Font} $FLOW"
-  echo -e "${Red} 加密方式(security):${Font} none "
-  echo -e "${Red} 传输协议(network):${Font} tcp "
-  echo -e "${Red} 伪装类型(type):${Font} none "
-  echo -e "${Red} 底层传输安全:${Font} tls"
-  echo -e "${Red} SNI:${Font}  $DOMAIN"
-  echo -e "${Red} 跳过证书验证(allowInsecure):${Font}  false"
-  echo -e "${Red} 指纹模拟(fingerprint):${Font}  chrome"
-  echo -e "${Red} Alpn:${Font}  h2,http/1.1"
+	echo -e "${Red} Vless 配置信息 ${Font}"
+	echo -e "${Red} 地址(address):${Font}  ${DOMAIN}"
+	echo -e "${Red} 端口(port):${Font}  ${PORT}"
+	echo -e "${Red} 用户 ID(UUID):${Font} ${UUID}"
+	echo -e "${Red} 流控(flow):${Font} ${FLOW}"
+	echo -e "${Red} 加密方式(security):${Font} none "
+	echo -e "${Red} 传输协议(network):${Font} tcp "
+	echo -e "${Red} 伪装类型(type):${Font} none "
+	echo -e "${Red} 底层传输安全:${Font} tls"
+	echo -e "${Red} SNI:${Font}  ${DOMAIN}"
+	echo -e "${Red} 跳过证书验证(allowInsecure):${Font}  false"
+	echo -e "${Red} 指纹模拟(fingerprint):${Font}  chrome"
+	echo -e "${Red} Alpn:${Font}  h2,http/1.1"
 }
 
-trojan_info() {
-  PASSWD=$(cat ${xray_conf_dir}/config.json | jq .inbounds[1].settings.clients[0].password | tr -d '"')
-  PORT=$(cat ${xray_conf_dir}/config.json | jq .inbounds[0].port)
-  FLOW=$(cat ${xray_conf_dir}/config.json | jq .inbounds[0].settings.clients[0].flow | tr -d '"')
-  DOMAIN=$(cat ${domain_tmp_dir}/domain)
+function trojan_info() {
+	PASSWD=$(cat ${xray_conf_dir}/config.json | jq .inbounds[1].settings.clients[0].password | tr -d '"')
+	PORT=$(cat ${xray_conf_dir}/config.json | jq .inbounds[0].port)
+	FLOW=$(cat ${xray_conf_dir}/config.json | jq .inbounds[0].settings.clients[0].flow | tr -d '"')
+	DOMAIN=$(cat ${domain_tmp_dir}/domain)
 
-  echo -e "${Red} Trojan 配置信息 ${Font}"
-  echo -e "${Red} 地址(address):${Font}  $DOMAIN"
-  echo -e "${Red} 端口(port):${Font}  $PORT"
-  echo -e "${Red} 密码(password):${Font} $PASSWD"
-  echo -e "${Red} 流控(flow):${Font} $FLOW"
-  echo -e "${Red} 传输协议(network):${Font} tcp "
-  echo -e "${Red} 伪装类型(type):${Font} none "
-  echo -e "${Red} 底层传输安全:${Font} tls"
-  echo -e "${Red} SNI:${Font} $DOMAIN"
-  echo -e "${Red} 跳过证书验证(allowInsecure):${Font}  false"
-  echo -e "${Red} 指纹模拟(fingerprint):${Font}  chrome"
-  echo -e "${Red} Alpn:${Font}  h2,http/1.1"
+	echo -e "${Red} Trojan 配置信息 ${Font}"
+	echo -e "${Red} 地址(address):${Font}  ${DOMAIN}"
+	echo -e "${Red} 端口(port):${Font}  ${PORT}"
+	echo -e "${Red} 密码(password):${Font} ${PASSWD}"
+	echo -e "${Red} 流控(flow):${Font} ${FLOW}"
+	echo -e "${Red} 传输协议(network):${Font} tcp "
+	echo -e "${Red} 伪装类型(type):${Font} none "
+	echo -e "${Red} 底层传输安全:${Font} tls"
+	echo -e "${Red} SNI:${Font} ${DOMAIN}"
+	echo -e "${Red} 跳过证书验证(allowInsecure):${Font}  false"
+	echo -e "${Red} 指纹模拟(fingerprint):${Font}  chrome"
+	echo -e "${Red} Alpn:${Font}  h2,http/1.1"
 }
 
-basic_info() {
-  print_ok "VLESS+Trojan+TCP+TLS+Nginx 安装成功"
-  vless_info
-  vless_link
-  trojan_info
-  trojan_link
+function basic_info() {
+	print_ok "VLESS+Trojan+TCP+TLS+Nginx 安装成功"
+	vless_info
+	vless_link
+	trojan_info
+	trojan_link
 }
 
-show_access_log() {
-  [ -f ${xray_access_log} ] && tail -f ${xray_access_log} || echo -e "${RedBG}log 文件不存在${Font}"
+function show_access_log() {
+	[ -f ${xray_access_log} ] && tail -f ${xray_access_log} || echo -e "${RedBG}log 文件不存在${Font}"
 }
 
-show_error_log() {
-  [ -f ${xray_error_log} ] && tail -f ${xray_error_log} || echo -e "${RedBG}log 文件不存在${Font}"
+function show_error_log() {
+	[ -f ${xray_error_log} ] && tail -f ${xray_error_log} || echo -e "${RedBG}log 文件不存在${Font}"
 }
 
-bbr_boost_sh() {
-  [ -f "tcp.sh" ] && rm -rf ./tcp.sh
-  wget -N --no-check-certificate "https://raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master/tcp.sh" && chmod +x tcp.sh && ./tcp.sh
+function bbr_boost_sh() {
+	[ -f "tcp.sh" ] && rm -rf ./tcp.sh
+	wget -N --no-check-certificate "https://raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master/tcp.sh" && chmod +x tcp.sh && ./tcp.sh
 }
 
-install_xray() {
-  check_root
-  system_check
-  dependency_install
-  basic_optimization
-  domain_check
-  port_exist_check 80
-  xray_install
-  configure_xray
-  nginx_install
-  ssl_judge_and_install
-  configure_nginx
-  restart_all
-  basic_info
+function install_xray() {
+	check_root
+	system_check
+	dependency_install
+	basic_optimization
+	domain_check
+	port_exist_check 80
+	xray_install
+	configure_xray
+	ssl_judge_and_install
+	nginx_install
+	configure_nginx
+	restart_all
+	basic_info
 }
 
-menu() {
-  clear
-  update_sh
-  shell_mode_check
-  echo -e "\t Xray 安装管理脚本 ${Red}[${shell_version}]${Font}"
-  echo -e "\t---authored by kxhubs---"
-  echo -e "\thttps://kxhubs.com:18512/kxhubs\n"
+function menu() {
+	clear
+	update_sh
+	shell_mode_check
+	echo -e "\t Xray 安装管理脚本 ${Red}[${shell_version}]${Font}"
+	echo -e "\t---authored by kxhubs---"
+	echo -e "\thttps://kxhubs.com:18512/kxhubs\n"
 
-  echo -e "当前已安装版本:${shell_mode}"
-  echo -e "—————————————— 安装向导 ——————————————"""
-  echo -e "${Green}0.${Font}  升级 脚本"
-  echo -e "${Green}1.${Font}  安装 Xray (VLESS + TCP + XTLS / TLS + Nginx + Trojan 回落并存模式)"
-  echo -e "—————————————— 配置变更 ——————————————"
-  echo -e "${Green}11.${Font} 变更 UUID"
-  echo -e "${Green}12.${Font} 变更 Trojan 密码"
-  echo -e "${Green}13.${Font} 变更 连接端口"
-  echo -e "—————————————— 查看信息 ——————————————"
-  echo -e "${Green}21.${Font} 查看 实时访问日志"
-  echo -e "${Green}22.${Font} 查看 实时错误日志"
-  echo -e "${Green}23.${Font} 查看 Xray 配置链接"
-  echo -e "${Green}24.${Font} 查看 Trojan 配置信息"
-  echo -e "—————————————— 其他选项 ——————————————"
-  echo -e "${Green}31.${Font} 安装 4 合 1 BBR、锐速安装脚本"
-  echo -e "${Green}32.${Font} 卸载 Xray"
-  echo -e "${Green}33.${Font} 更新 Xray-core"
-  echo -e "${Green}34.${Font} 安装 Xray-core 测试版 (Pre)"
-  echo -e "${Green}35.${Font} 手动更新 SSL 证书"
-  echo -e "${Green}40.${Font} 退出"
-  read -rp "请输入数字:" menu_num
-  case $menu_num in
-  0)
-    update_sh
-    ;;
-  1)
-    install_xray
-    ;;
-  11)
-    read -rp "请输入 UUID:" UUID
-    modify_UUID
-    restart_all
-    ;;
-  12)
-    read -rp "请输入 Trojan 密码:" PASSWD
-    modify_PASSWD
-    restart_all
-    ;;
-  13)
-    modify_port
-    restart_all
-    ;;
-  21)
-    tail -f $xray_access_log
-    ;;
-  22)
-    tail -f $xray_error_log
-    ;;
-  23)
-    vless_info
-    vless_link
-    ;;
-  24)
-    trojan_info
-    trojan_link
-    ;;
-  31)
-    bbr_boost_sh
-    ;;
-  32)
-    source '/etc/os-release'
-    xray_uninstall
-    ;;
-  33)
-    bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" - install
-    restart_all
-    ;;
-  34)
-    bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" - install --beta
-    restart_all
-    ;;
-  35)
-    "/root/.acme.sh"/acme.sh --cron --home "/root/.acme.sh"
-    restart_all
-    ;;
-  40)
-    exit 0
-    ;;
-  *)
-    print_error "请输入正确的数字"
-    ;;
-  esac
+	echo -e "当前脚本状态:${Yellow}[${shell_mode}]${Font}"
+	echo -e "—————————————— 安装向导 ——————————————"""
+	echo -e "${Green}0.${Font}  升级 脚本"
+	echo -e "${Green}1.${Font}  安装 Xray (VLESS + TCP + XTLS / TLS + Nginx + Trojan 回落并存模式)"
+	echo -e "—————————————— 配置变更 ——————————————"
+	echo -e "${Green}11.${Font} 变更 UUID"
+	echo -e "${Green}12.${Font} 变更 Trojan 密码"
+	echo -e "${Green}13.${Font} 变更 连接端口"
+	echo -e "—————————————— 查看信息 ——————————————"
+	echo -e "${Green}21.${Font} 查看 实时访问日志"
+	echo -e "${Green}22.${Font} 查看 实时错误日志"
+	echo -e "${Green}23.${Font} 查看 Xray 配置链接"
+	echo -e "${Green}24.${Font} 查看 Trojan 配置信息"
+	echo -e "—————————————— 其他选项 ——————————————"
+	echo -e "${Green}31.${Font} 安装 4 合 1 BBR、锐速安装脚本"
+	echo -e "${Green}32.${Font} 卸载 Xray"
+	echo -e "${Green}33.${Font} 更新 Xray-core"
+	echo -e "${Green}34.${Font} 安装 Xray-core 测试版 (Pre)"
+	echo -e "${Green}35.${Font} 手动更新 SSL 证书"
+	echo -e "${Green}40.${Font} 退出"
+	read -rp "请输入数字:" menu_num
+	case $menu_num in
+	0)
+		update_sh
+		;;
+	1)
+		install_xray
+		;;
+	11)
+		if [[ $shell_mode == "未安装" ]]; then
+			print_error "脚本未安装，无法修改UUID"
+			exit 1
+		fi
+		read -rp "请输入 UUID:" UUID
+		modify_uuid
+		restart_all
+		;;
+	12)
+		if [[ $shell_mode == "未安装" ]]; then
+			print_error "脚本未安装，无法修改Trojan 密码"
+			exit 1
+		fi
+		read -rp "请输入 Trojan 密码:" PASSWD
+		modify_passwd
+		restart_all
+		;;
+	13)
+		if [[ $shell_mode == "未安装" ]]; then
+			print_error "脚本未安装，无法修改端口"
+			exit 1
+		fi
+		modify_port
+		restart_all
+		;;
+	21)
+		if [[ $shell_mode == "未安装" ]]; then
+			print_error "脚本未安装，无法查看访问日志"
+			exit 1
+		fi
+		tail -f $xray_access_log
+		;;
+	22)
+		if [[ $shell_mode == "未安装" ]]; then
+			print_error "脚本未安装，无法查看错误日志"
+			exit 1
+		fi
+		tail -f $xray_error_log
+		;;
+	23)
+		if [[ $shell_mode == "未安装" ]]; then
+			print_error "脚本未安装，无法查看配置信息"
+			exit 1
+		fi
+		vless_info
+		vless_link
+		;;
+	24)
+		if [[ $shell_mode == "未安装" ]]; then
+			print_error "脚本未安装，无法查看配置信息"
+			exit 1
+		fi
+		trojan_info
+		trojan_link
+		;;
+	31)
+		bbr_boost_sh
+		;;
+	32)
+		if [[ $shell_mode == "未安装" ]]; then
+			print_error "脚本未安装，无法卸载"
+			exit 1
+		fi
+		source '/etc/os-release'
+		xray_uninstall
+		;;
+	33)
+		bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" - install
+		restart_all
+		;;
+	34)
+		bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" - install --beta
+		restart_all
+		;;
+	35)
+		"/root/.acme.sh"/acme.sh --cron --home "/root/.acme.sh"
+		restart_all
+		;;
+	40)
+		exit 0
+		;;
+	*)
+		print_error "请输入正确的数字"
+		;;
+	esac
 }
 menu "$@"
