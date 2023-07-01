@@ -21,7 +21,7 @@ OK="${Green}[OK]${Font}"
 ERROR="${Red}[ERROR]${Font}"
 
 # 变量
-shell_version="0.4.6"
+shell_version="0.4.8"
 gitea_branch="main"
 xray_conf_dir="/usr/local/etc/xray"
 xray_access_log="/var/log/xray/access.log"
@@ -376,7 +376,7 @@ function ssl_chekck_and_install() {
 	else
 		mkdir /ssl
 		acme_install
-		ssl_install
+		ssl_judge_and_install
 	fi
 
 	# Xray 默认以 nobody 用户运行，证书权限适配
