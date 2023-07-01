@@ -534,10 +534,10 @@ function install_xray() {
 	system_check
 	dependency_install
 	basic_optimization
-	domain_check
 	port_exist_check 80
 	xray_install
 	configure_xray
+        domain_check
 	ssl_judge_and_install
 	nginx_install
 	configure_nginx
