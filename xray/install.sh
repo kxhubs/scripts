@@ -21,7 +21,7 @@ OK="${Green}[OK]${Font}"
 ERROR="${Red}[ERROR]${Font}"
 
 # 变量
-shell_version="0.5.1"
+shell_version="0.5.3"
 gitea_branch="main"
 xray_conf_dir="/usr/local/etc/xray"
 xray_access_log="/var/log/xray/access.log"
@@ -318,7 +318,7 @@ function acme_install() {
 	check "安装 SSL 证书生成脚本"
 }
 
-function ssl_judge_and_install() {
+function ssl_install() {
 	"$HOME"/.acme.sh/acme.sh --set-default-ca --server letsencrypt   #设置默认颁发证书机构为letsencrypt
 	if "$HOME"/.acme.sh/acme.sh --issue --standalone --insecure -d "${domain}" --webroot /ssl -k ec-256 --force; then
 		print_ok "SSL 证书生成成功"
@@ -376,7 +376,7 @@ function ssl_chekck_and_install() {
 	else
 		mkdir /ssl
 		acme_install
-		ssl_judge_and_install
+		ssl_install
 	fi
 
 	# Xray 默认以 nobody 用户运行，证书权限适配
