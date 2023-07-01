@@ -21,7 +21,7 @@ OK="${Green}[OK]${Font}"
 ERROR="${Red}[ERROR]${Font}"
 
 # 变量
-shell_version="0.5.3"
+shell_version="0.5.5"
 gitea_branch="main"
 xray_conf_dir="/usr/local/etc/xray"
 xray_access_log="/var/log/xray/access.log"
@@ -535,12 +535,12 @@ function install_xray() {
 	dependency_install
 	basic_optimization
 	port_exist_check 80
-        domain_check
+    domain_check
 	xray_install
 	configure_xray
+	ssl_judge_and_install
 	nginx_install
 	configure_nginx
-	ssl_judge_and_install
 	restart_all
 	basic_info
 }
