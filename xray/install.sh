@@ -21,7 +21,7 @@ OK="${Green}[OK]${Font}"
 ERROR="${Red}[ERROR]${Font}"
 
 # 变量
-shell_version="0.5.5"
+shell_version="0.5.6"
 gitea_branch="main"
 xray_conf_dir="/usr/local/etc/xray"
 xray_access_log="/var/log/xray/access.log"
@@ -132,6 +132,10 @@ function system_check() {
 	else
 		print_error "当前系统为 ${ID} ${VERSION_ID} 不在支持的系统列表内"
 		exit 0
+	fi
+
+        if [[ $(grep "nogroup" /etc/group) ]]; then
+		cert_group="nogroup"
 	fi
 	
 	# 关闭防火墙
@@ -330,7 +334,7 @@ function ssl_install() {
 				wg-quick up wgcf >/dev/null 2>&1
 				print_ok "已启动 wgcf-warp"
 			fi
-	fi
+	        fi
 	elif "$HOME"/.acme.sh/acme.sh --issue --standalone --insecure -d "${domain}" --webroot /ssl -k ec-256 --force --listen-v6; then
 		print_ok "SSL 证书生成成功"
 		sleep 2
