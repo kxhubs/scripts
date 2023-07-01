@@ -21,7 +21,7 @@ OK="${Green}[OK]${Font}"
 ERROR="${Red}[ERROR]${Font}"
 
 # 变量
-shell_version="0.4.8"
+shell_version="0.5.1"
 gitea_branch="main"
 xray_conf_dir="/usr/local/etc/xray"
 xray_access_log="/var/log/xray/access.log"
@@ -214,6 +214,9 @@ function xray_install() {
 	print_ok "安装Xray"
 	bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
 	check "Xray安装"
+
+	echo $domain >$domain_tmp_dir/domain
+	check "域名记录"
 }
 
 function modify_uuid() {
@@ -308,9 +311,6 @@ function domain_check() {
 			;;
 		esac
 	fi
-	
-	echo $domain >$domain_tmp_dir/domain
-	check "域名记录"
 }
 
 function acme_install() {
@@ -535,13 +535,12 @@ function install_xray() {
 	dependency_install
 	basic_optimization
 	port_exist_check 80
+        domain_check
 	xray_install
 	configure_xray
-        domain_check
-	ssl_chekck_and_install
-	ssl_judge_and_install
 	nginx_install
 	configure_nginx
+	ssl_judge_and_install
 	restart_all
 	basic_info
 }
