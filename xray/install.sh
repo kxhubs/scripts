@@ -419,7 +419,7 @@ function configure_xray() {
 	modify_passwd
 }
 
-function uninstall() {
+function xray_uninstall() {
 	curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh | bash -s -- remove --purge
 	print_ok "是否卸载nginx [Y/N]?"
 	read -r uninstall_nginx
