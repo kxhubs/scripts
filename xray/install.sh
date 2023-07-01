@@ -535,7 +535,7 @@ function install_xray() {
 	dependency_install
 	basic_optimization
 	port_exist_check 80
-    domain_check
+        domain_check
 	xray_install
 	configure_xray
 	ssl_judge_and_install
