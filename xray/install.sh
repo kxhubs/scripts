@@ -353,7 +353,7 @@ function ssl_install() {
 	fi
 }
 
-function ssl_chekck_and_install() {
+function ssl_judge_and_install() {
 	mkdir -p /ssl >/dev/null 2>&1
 	if [[ -f "/ssl/xray.key" || -f "/ssl/xray.crt" ]]; then
 		print_ok "/ssl 目录下证书文件已存在"
