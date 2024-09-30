@@ -21,7 +21,7 @@ OK="${Green}[OK]${Font}"
 ERROR="${Red}[ERROR]${Font}"
 
 # 变量
-shell_version="0.5.6"
+shell_version="0.5.8"
 gitea_branch="main"
 xray_conf_dir="/usr/local/etc/xray"
 xray_access_log="/var/log/xray/access.log"
@@ -52,7 +52,7 @@ function check() {
 }
 
 function check_root() {
-    if [ $(id -u) -ne 0 ];then
+    if [ "$(id -u)" -ne 0 ];then
 		echo "当前不是root用户"
 		exit 1
 	fi
