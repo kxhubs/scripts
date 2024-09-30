@@ -324,7 +324,7 @@ function acme_install() {
 
 function ssl_install() {
 	"$HOME"/.acme.sh/acme.sh --set-default-ca --server letsencrypt   #设置默认颁发证书机构为letsencrypt
-	if "$HOME"/.acme.sh/acme.sh --issue --standalone --insecure -d "${domain}" --webroot /ssl -k ec-256 --force; then
+	if "$HOME"/.acme.sh/acme.sh --issue --standalone --httpport 8080 --insecure -d "${domain}" --webroot /ssl -k ec-256 --force; then
 		print_ok "SSL 证书生成成功"
 		sleep 2
 		if "$HOME"/.acme.sh/acme.sh --installcert -d "${domain}" --fullchainpath /ssl/xray.crt --keypath /ssl/xray.key --reloadcmd "systemctl restart xray" --ecc --force; then
@@ -539,7 +539,8 @@ function install_xray() {
 	dependency_install
 	basic_optimization
 	port_exist_check 80
-        domain_check
+	port_exist_check 8080
+  domain_check
 	xray_install
 	configure_xray
 	ssl_judge_and_install
