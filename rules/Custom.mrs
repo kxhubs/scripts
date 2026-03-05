@@ -1,0 +1,10 @@
+payload:
+  # PikPak 下载节点加速 - 强制直连
+  - DOMAIN-KEYWORD,dl-a10b-,DIRECT
+  - DOMAIN-KEYWORD,dl-z01a-,DIRECT
+
+  # PikPak 主域名及相关服务 - 走代理
+  - DOMAIN-SUFFIX,mypikpak.com
+  - DOMAIN-SUFFIX,mypikpak.net
+  - DOMAIN-SUFFIX,pikpak.me
+  - DOMAIN-SUFFIX,pikpakdrive.com
