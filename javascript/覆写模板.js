@@ -50,29 +50,27 @@ function main(config) {
   });
 
 
-  // ==================== 3. 远程自定义规则配置 (追加) ====================
-  config["rule-providers"] = config["rule-providers"] || {};
-  
-  // 插入自定义的远端 list 规则集
-  // 【需修改】替换 url 为你实际的 GitHub Raw 地址，behavior 视 list 内容而定(classical 或 domain 等)
-  config["rule-providers"]["custom_remote_rule"] = {
-    "type": "http",
-    "behavior": "classical", 
-    "url": "https://raw.githubusercontent.com/kxhubs/scripts/refs/heads/main/rules/Custom.list",
-    "path": "./ruleset/custom_remote_rule.yaml",
-    "interval": 86400
-  };
+// ==================== 3. 远程自定义规则配置 (追加) ====================
+config["rule-providers"] = config["rule-providers"] || {};
 
-  config.rules = config.rules ||[];
-  
-  // 【需修改】将你的规则插入到规则列表的最前面。
-  // 将 "🚀 节点选择" 替换为你模板里实际要指向的策略组名称
-  const customRule = "RULE-SET,custom_remote_rule,🚀 节点选择";
-  
-  // 检查是否已经存在（防重复插入），不存在则插在规则数组开头
-  if (!config.rules.includes(customRule)) {
-    config.rules.unshift(customRule);
-  }
+// 插入自定义的远端 list 规则集
+config["rule-providers"]["custom_remote_rule"] = {
+  "type": "http",
+  "behavior": "classical",
+  "url": "https://raw.githubusercontent.com/kxhubs/scripts/refs/heads/main/rules/Custom.list",
+  "path": "./ruleset/custom_remote_rule.yaml",
+  "interval": 86400
+};
+
+config.rules = config.rules || [];
+
+// 【关键修改】不再指定策略组，让 list 里的规则自己决定 DIRECT / 代理
+const customRule = "RULE-SET,custom_remote_rule";
+
+// 检查是否已经存在（防重复插入），不存在则插在规则数组开头
+if (!config.rules.some(rule => rule === customRule)) {
+  config.rules.unshift(customRule);
+}
 
   // 返回修改完成后的配置对象
   return config;
