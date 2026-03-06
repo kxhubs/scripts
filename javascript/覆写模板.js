@@ -64,8 +64,7 @@ config["rule-providers"]["custom_remote_rule"] = {
 
 config.rules = config.rules || [];
 
-// 【关键修改】不再指定策略组，让 list 里的规则自己决定 DIRECT / 代理
-const customRule = "RULE-SET,custom_remote_rule";
+const customRule = "RULE-SET,custom_remote_rule,默认代理";
 
 // 检查是否已经存在（防重复插入），不存在则插在规则数组开头
 if (!config.rules.some(rule => rule === customRule)) {
