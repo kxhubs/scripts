@@ -1,13 +1,12 @@
 function main(config) {
   // ==================== 1. DNS 基础与防污染分流配置 (修改与合并) ====================
-  // 如果原有配置没有 dns，则初始化一个空对象
   config.dns = config.dns || {};
-  
+
   config.dns["enable"] = true;
-  config.dns["enhanced-mode"] = "fake-ip"; 
-  
+  config.dns["enhanced-mode"] = "fake-ip";
+
   // 仅覆盖核心的 nameserver 为你的 5554 国外组防污染端口
-  config.dns["nameserver"] =[
+  config.dns["nameserver"] = [
     "127.0.0.1:5554"
   ];
 
@@ -20,7 +19,7 @@ function main(config) {
 
   // 安全追加 fake-ip-filter（如果模板里已经有其他的，保留它们）
   config.dns["fake-ip-filter"] = config.dns["fake-ip-filter"] || [];
-  const extraFakeIpFilters =[
+  const extraFakeIpFilters = [
     "*.lan", "*.localdomain", "*.example", "*.invalid", "*.localhost", "*.test", "*.local", "router.asus.com"
   ];
   extraFakeIpFilters.forEach(domain => {
@@ -29,10 +28,9 @@ function main(config) {
     }
   });
 
-
   // ==================== 2. TUN 路由器环境配置 (修改与合并) ====================
   config.tun = config.tun || {};
-  
+
   // 覆盖/补充适合路由器的核心 TUN 参数
   config.tun["enable"] = true;
   config.tun["stack"] = "system"; // Linux/路由器推荐 system
@@ -49,27 +47,34 @@ function main(config) {
     }
   });
 
+  // ==================== 3. 远程自定义规则配置 (追加) ====================
+  config["rule-providers"] = config["rule-providers"] || {};
+  // 插入自定义的远端 list 规则集
+  config["rule-providers"]["custom_remote_rule"] = {
+    "type": "http",
+    "behavior": "classical",
+    "url": "https://raw.githubusercontent.com/kxhubs/scripts/refs/heads/main/rules/Custom.list",
+    "path": "./ruleset/custom_remote_rule.yaml",
+    "interval": 86400
+  };
 
-// ==================== 3. 远程自定义规则配置 (追加) ====================
-config["rule-providers"] = config["rule-providers"] || {};
+  config.rules = config.rules || [];
+  const customRule = "RULE-SET,custom_remote_rule,默认代理";
+  // 检查是否已经存在（防重复插入），不存在则插在规则数组开头
+  if (!config.rules.some(rule => rule === customRule)) {
+    config.rules.unshift(customRule);
+  }
 
-// 插入自定义的远端 list 规则集
-config["rule-providers"]["custom_remote_rule"] = {
-  "type": "http",
-  "behavior": "classical",
-  "url": "https://raw.githubusercontent.com/kxhubs/scripts/refs/heads/main/rules/Custom.list",
-  "path": "./ruleset/custom_remote_rule.yaml",
-  "interval": 86400
-};
+  // ==================== 4. 新增：将 external-controller 监听地址改为 0.0.0.0:9090 ====================
+  config["external-controller"] = "0.0.0.0:9090";  // 强制监听所有接口，便于局域网访问面板
 
-config.rules = config.rules || [];
+  // 安全合并/补充 external-ui 相关配置（防止覆盖用户已有设置）
+  config["external-ui"] = config["external-ui"] || "ui";
+  config["external-ui-name"] = config["external-ui-name"] || "zashboard";
+  config["external-ui-url"] = config["external-ui-url"] || "https://github.com/Zephyruso/zashboard/releases/latest/download/dist.zip";
 
-const customRule = "RULE-SET,custom_remote_rule,默认代理";
-
-// 检查是否已经存在（防重复插入），不存在则插在规则数组开头
-if (!config.rules.some(rule => rule === customRule)) {
-  config.rules.unshift(customRule);
-}
+  // 可选：如果想同时放开 mixed-port / socks-port / http-port 监听所有接口（默认 bind-address: '*' 已实现）
+  // config["bind-address"] = "*";  // 你的原配置已有，不需重复
 
   // 返回修改完成后的配置对象
   return config;
