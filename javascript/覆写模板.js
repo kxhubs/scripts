@@ -48,7 +48,7 @@ function main(config) {
   config["rule-providers"]["custom_direct_rule"] = {
     "type": "http",
     "behavior": "classical",
-    "url": "https://raw.githubusercontent.com/你的用户名/你的仓库/main/rules/direct.list",  // ← 替换成你的实际 DIRECT 规则 URL
+    "url": "https://raw.githubusercontent.com/kxhubs/scripts/refs/heads/main/rules/%E7%9B%B4%E8%BF%9E%E8%A7%84%E5%88%99.list",  // ← 替换成你的实际 DIRECT 规则 URL
     "path": "./ruleset/custom_direct_rule.yaml",
     "interval": 86400
   };
@@ -57,7 +57,7 @@ function main(config) {
   config["rule-providers"]["custom_proxy_rule"] = {
     "type": "http",
     "behavior": "classical",
-    "url": "https://raw.githubusercontent.com/你的用户名/你的仓库/main/rules/proxy.list",  // ← 替换成你的实际 PROXY 规则 URL
+    "url": "https://raw.githubusercontent.com/kxhubs/scripts/refs/heads/main/rules/%E4%BB%A3%E7%90%86%E8%A7%84%E5%88%99.list",  // ← 替换成你的实际 PROXY 规则 URL
     "path": "./ruleset/custom_proxy_rule.yaml",
     "interval": 86400
   };
@@ -65,22 +65,16 @@ function main(config) {
   config.rules = config.rules || [];
 
   // 插入规则到最前面（最高优先级）：先 DIRECT 的 PikPak 下载，再 PROXY 的 PikPak 服务，最后原有 custom_remote_rule
-  const highPriorityRules = [
-    "RULE-SET,custom_direct_rule,DIRECT",   // 先匹配强制直连（加速下载）
+  const priorityOrder = [
+    "RULE-SET,custom_direct_rule,直接连接",   // 先匹配强制直连（加速下载）
     "RULE-SET,custom_proxy_rule,默认代理"   // 再匹配需要代理的域名
   ];
 
-  highPriorityRules.forEach(rule => {
+  priorityOrder.reverse().forEach(rule => {
     if (!config.rules.some(r => r === rule)) {
       config.rules.unshift(rule);
     }
   });
-
-  // 原有 custom_remote_rule 插入（如果需要保持在前面，也可 unshift；这里保持原逻辑放后面）
-  const customRemoteRule = "RULE-SET,custom_remote_rule,默认代理";
-  if (!config.rules.some(rule => rule === customRemoteRule)) {
-    config.rules.unshift(customRemoteRule);  // 如果想让它也优先，可保持 unshift；否则 push 到后面
-  }
 
   // ==================== 4. 新增：将 external-controller 监听地址改为 0.0.0.0:9090 ====================
   config["external-controller"] = "0.0.0.0:9090"; // 强制监听所有接口，便于局域网访问面板
