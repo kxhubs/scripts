@@ -1,4 +1,4 @@
 payload:
   # PikPak 下载节点加速 - 强制直连
-  - DOMAIN-KEYWORD,dl-a10b-,直接连接
-  - DOMAIN-KEYWORD,dl-z01a-,直接连接
+  - DOMAIN-KEYWORD,dl-a10b-
+  - DOMAIN-KEYWORD,dl-z01a-
