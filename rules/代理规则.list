@@ -6,3 +6,6 @@ payload:
   - DOMAIN-SUFFIX,pikpakdrive.com
 
   - DOMAIN,kxhub.cc
+  - DOMAIN,ssl.gstatic.com
+  - DOMAIN,fonts.gstatic.com
+  - DOMAIN,www.gstatic.com
