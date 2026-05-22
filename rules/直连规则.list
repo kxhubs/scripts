@@ -3,6 +3,3 @@ payload:
   - DOMAIN-KEYWORD,dl-a10b-
   - DOMAIN-KEYWORD,dl-z01a-
 
-  - DOMAIN,ssl.gstatic.com
-  - DOMAIN,fonts.gstatic.com
-  - DOMAIN,www.gstatic.com
