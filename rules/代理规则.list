@@ -9,3 +9,4 @@ payload:
   - DOMAIN,ssl.gstatic.com
   - DOMAIN,fonts.gstatic.com
   - DOMAIN,www.gstatic.com
+  - DOMAIN,tmate.io
