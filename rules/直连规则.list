@@ -4,11 +4,11 @@ payload:
   - DOMAIN-KEYWORD,dl-z01a-
 
   # Binance 币安直连
-  - DOMAIN-SUFFIX,binance.com,DIRECT
-  - DOMAIN-SUFFIX,binance.me,DIRECT
-  - DOMAIN-SUFFIX,binance.cloud,DIRECT
-  - DOMAIN-SUFFIX,binance.info,DIRECT
-  - DOMAIN-SUFFIX,binance.us,DIRECT
-  - DOMAIN-SUFFIX,binancecnt.com,DIRECT
-  - DOMAIN-SUFFIX,bnbstatic.com,DIRECT
-  - DOMAIN-SUFFIX,bntrace.com,DIRECT
+  - DOMAIN-SUFFIX,binance.com
+  - DOMAIN-SUFFIX,binance.me
+  - DOMAIN-SUFFIX,binance.cloud
+  - DOMAIN-SUFFIX,binance.info
+  - DOMAIN-SUFFIX,binance.us
+  - DOMAIN-SUFFIX,binancecnt.com
+  - DOMAIN-SUFFIX,bnbstatic.com
+  - DOMAIN-SUFFIX,bntrace.com
