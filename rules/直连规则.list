@@ -1,7 +1,4 @@
 payload:
-  # PikPak 下载节点加速 - 强制直连
-  - DOMAIN-KEYWORD,dl-a10b-
-  - DOMAIN-KEYWORD,dl-z01a-
 
   # Binance 币安直连
   - DOMAIN-SUFFIX,binance.com
